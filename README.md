@@ -1,6 +1,60 @@
-# Excel → PowerPoint Generator (Microsoft Graph + Python)
+# PowerPoint Processing & Generation Suite
 
-This project creates a **new PowerPoint presentation** in OneDrive using your **Framework Master Deck (.pptx)** as the template. 
+This project provides comprehensive PowerPoint processing capabilities:
+1. **Excel → PowerPoint Generator** - Creates PowerPoint presentations from Excel data using Microsoft Graph
+2. **PowerPoint Extraction API** - Extracts data from PowerPoint files to Excel (via S3)
+3. **🆕 Slide Generation API** - Programmatically generate custom slides (Points, Image+Text, Tables)
+
+## 🆕 NEW: Slide Generation API (v2.0)
+
+Generate custom PowerPoint slides programmatically with our REST API! Perfect for:
+- Automated report generation
+- Dynamic presentations from data
+- Template-based content creation
+- Bulk slide generation
+
+**Quick Example:**
+```bash
+curl -X POST "http://localhost:8000/api/slides/generate-points-slide" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template_s3_url": "presentations/template.pptx",
+    "slide_data": {
+      "slide_number": 2,
+      "header": "Overview",
+      "description": "Key project highlights",
+      "points": [
+        {"text": "Feature 1", "color": "#3667B2"},
+        {"text": "Feature 2", "color": "#000000"}
+      ]
+    }
+  }'
+```
+
+**📚 Documentation:**
+- [Quick Start Guide](SLIDE_GENERATION_README.md) - Get started in 5 minutes
+- [Complete API Guide](SLIDE_API_GUIDE.md) - Detailed API documentation
+- [Quick Reference](QUICK_REFERENCE.md) - Cheat sheet for developers
+- [API Flow Diagram](API_FLOW_DIAGRAM.md) - Architecture overview
+- [Examples](example_slide_generation.py) - Working code examples
+
+**🎯 Supported Slide Types:**
+- **Points Slides**: Header, description, bullet points, and images
+- **Image+Text Slides**: Title, text content, and images
+- **Table Slides**: Title and data tables
+- **Multi-Slide**: Combine multiple types in one presentation
+
+**Start the API Server:**
+```bash
+python3 main.py
+# Visit http://localhost:8000/docs for interactive API documentation
+```
+
+---
+
+## Excel → PowerPoint Generator (Original Feature)
+
+This creates a **new PowerPoint presentation** in OneDrive using your **Framework Master Deck (.pptx)** as the template. 
 It reads the presentation title from cell **A1** of a local Excel file and names the generated deck accordingly.
 
 ## What it does
