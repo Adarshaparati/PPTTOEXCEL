@@ -98,19 +98,11 @@ class SlideDataService:
                 print(f"📥 Using provided key: {key}")
             
             # Download from S3 using boto3
-            result = s3_service.download_file(key)
-            
-            if not result or not isinstance(result, dict):
-                raise RuntimeError("S3 service returned invalid response")
-            
-            if not result.get('success'):
-                error_msg = result.get('error', 'Unknown error')
-                raise RuntimeError(f"S3 download failed: {error_msg}")
-            
-            file_data = result.get('file_data')
+            file_data = s3_service.download_file(key)
+
             if not file_data:
-                raise RuntimeError("No file data returned from S3")
-            
+                raise RuntimeError(f"S3 download failed or returned no data for key: {key}")
+
             print(f"✅ Template downloaded successfully ({len(file_data)} bytes)")
             return BytesIO(file_data)
             

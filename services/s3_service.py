@@ -81,42 +81,33 @@ class S3Service:
                 "error": str(e)
             }
     
-    def download_file(self, s3_key: str) -> dict:
+    def download_file(self, s3_key: str) -> Optional[bytes]:
         """
-        Download file from S3
-        
+        Download file from S3 and return raw bytes.
+
         Args:
             s3_key: S3 object key (should be unquoted/decoded)
-            
+
         Returns:
-            dict with success status and file_data or error
+            file content as bytes on success, or None on failure
         """
         try:
             print(f"📥 S3 Download - Bucket: {self.bucket_name}, Key: {s3_key}")
             buffer = BytesIO()
             self.s3_client.download_fileobj(self.bucket_name, s3_key, buffer)
             buffer.seek(0)
-            file_size = len(buffer.getvalue())
+            data = buffer.getvalue()
+            file_size = len(data)
             print(f"✅ Downloaded {file_size} bytes from S3")
-            return {
-                "success": True,
-                "file_data": buffer.getvalue(),
-                "s3_key": s3_key
-            }
+            return data
         except self.s3_client.exceptions.NoSuchKey:
             error_msg = f"File not found in S3. Key: {s3_key}"
             print(f"❌ {error_msg}")
-            return {
-                "success": False,
-                "error": error_msg
-            }
+            return None
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
             print(f"❌ Error downloading from S3: {error_msg}")
-            return {
-                "success": False,
-                "error": error_msg
-            }
+            return None
     
     def get_file_url(self, s3_key: str, expiration: int = 3600) -> Optional[str]:
         """

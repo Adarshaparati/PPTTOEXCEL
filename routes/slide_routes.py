@@ -58,6 +58,74 @@ class PhasesSlideData(BaseModel):
     timeline_color: Optional[str] = Field(None, description="Hex color for timeline elements")
 
 
+class StatData(BaseModel):
+    """Model for individual statistic item"""
+    label: str = Field(..., description="Statistic label/name")
+    value: str = Field(..., description="Statistic value")
+    color: Optional[str] = Field(None, description="Hex color for this stat")
+    font_size: Optional[int] = Field(None, description="Font size for this stat")
+
+
+class StatisticsSlideData(BaseModel):
+    """Model for statistics slide data"""
+    slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
+    title: str = Field(..., description="Slide title")
+    description: Optional[str] = Field(None, description="Optional description text")
+    stat_data: List[StatData] = Field(..., description="List of statistics to display")
+    title_color: Optional[str] = Field(None, description="Hex color for title")
+    description_color: Optional[str] = Field(None, description="Hex color for description")
+    background_color: Optional[str] = Field(None, description="Hex color for background")
+
+
+class PeopleSlideData(BaseModel):
+    """Model for people slide data"""
+    slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
+    title: str = Field(..., description="Slide title")
+    description: Optional[str] = Field(None, description="Optional description text")
+    names: List[str] = Field(..., description="List of people names")
+    designations: List[str] = Field(..., description="List of designations/titles")
+    descriptions: List[str] = Field(..., description="List of descriptions for each person")
+    title_color: Optional[str] = Field(None, description="Hex color for title")
+    description_color: Optional[str] = Field(None, description="Hex color for description")
+    background_color: Optional[str] = Field(None, description="Hex color for background")
+
+
+class CoverSlideData(BaseModel):
+    """Model for cover slide data"""
+    slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
+    title: str = Field(..., description="Main title of the presentation")
+    subtitle: str = Field(default="Generated via Template Flow", description="Subtitle text")
+    slide_name: str = Field(..., description="Name of the slide")
+    slide_data_id: Optional[str] = Field(None, description="Slide data identifier")
+    slide_type: str = Field(default="Cover", description="Type of slide")
+    company_name: str = Field(..., description="Company name")
+    image: List[str] = Field(default_factory=list, description="Array of image URLs")
+    colors: Optional[Dict[str, str]] = Field(None, description="Color scheme dictionary")
+
+
+class ContactSlideData(BaseModel):
+    """Model for contact slide data"""
+    slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
+    title: str = Field(..., description="Contact slide title")
+    slide_name: str = Field(..., description="Name of the slide")
+    website_link: str = Field(..., description="Website URL")
+    linkedin_link: str = Field(default="", description="LinkedIn profile URL")
+    contact_email: str = Field(default="", description="Contact email address")
+    contact_phone: str = Field(default="", description="Contact phone number")
+    image: List[str] = Field(default_factory=list, description="Array of image URLs")
+    colors: Optional[Dict[str, str]] = Field(None, description="Color scheme dictionary")
+
+
+class ImagesSlideData(BaseModel):
+    """Model for images slide data"""
+    slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
+    slide_name: str = Field(..., description="Name of the slide")
+    title: str = Field(..., description="Slide title")
+    headers: Optional[List[str]] = Field(None, description="Array of headers for each image")
+    descriptions: Optional[List[str]] = Field(None, description="Array of descriptions for each image")
+    images: Optional[List[str]] = Field(None, description="Array of image URLs")
+
+
 class TableSlideData(BaseModel):
     """Model for table slide data"""
     slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
@@ -99,9 +167,49 @@ class PhasesSlideRequest(BaseModel):
     output_filename: Optional[str] = Field(None, description="Custom output filename")
 
 
+class StatisticsSlideRequest(BaseModel):
+    """Request model for generating statistics slide"""
+    template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
+    slide_data: StatisticsSlideData
+    upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
+    output_filename: Optional[str] = Field(None, description="Custom output filename")
+
+
+class PeopleSlideRequest(BaseModel):
+    """Request model for generating people slide"""
+    template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
+    slide_data: PeopleSlideData
+    upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
+    output_filename: Optional[str] = Field(None, description="Custom output filename")
+
+
+class CoverSlideRequest(BaseModel):
+    """Request model for generating cover slide"""
+    template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
+    slide_data: CoverSlideData
+    upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
+    output_filename: Optional[str] = Field(None, description="Custom output filename")
+
+
+class ContactSlideRequest(BaseModel):
+    """Request model for generating contact slide"""
+    template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
+    slide_data: ContactSlideData
+    upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
+    output_filename: Optional[str] = Field(None, description="Custom output filename")
+
+
+class ImagesSlideRequest(BaseModel):
+    """Request model for generating images slide"""
+    template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
+    slide_data: ImagesSlideData
+    upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
+    output_filename: Optional[str] = Field(None, description="Custom output filename")
+
+
 class SlideConfig(BaseModel):
     """Model for individual slide configuration in multi-slide generation"""
-    slide_type: str = Field(..., description="Type of slide: 'points', 'image_text', or 'table'")
+    slide_type: str = Field(..., description="Type of slide: 'points', 'image_text', 'table', 'phases', 'statistics', 'people', 'cover', 'contact', or 'images'")
     slide_data: Dict[str, Any] = Field(..., description="Data specific to the slide type")
 
 
@@ -452,6 +560,475 @@ async def generate_phases_slide(request: PhasesSlideRequest):
         )
 
 
+@router.post("/generate-statistics-slide")
+async def generate_statistics_slide(request: StatisticsSlideRequest):
+    """
+    Generate a statistics slide
+    
+    Example request:
+    ```json
+    {
+        "template_s3_url": "https://bucket.s3.region.amazonaws.com/path/presentation.pptx",
+        "slide_data": {
+            "slide_number": 5,
+            "title": "Key Metrics",
+            "description": "Performance statistics for Q4 2024",
+            "stat_data": [
+                {
+                    "label": "Total Users",
+                    "value": "1.2M",
+                    "color": "#28a745",
+                    "font_size": 24
+                },
+                {
+                    "label": "Revenue Growth",
+                    "value": "+35%",
+                    "color": "#007bff",
+                    "font_size": 24
+                },
+                {
+                    "label": "Customer Satisfaction",
+                    "value": "4.8/5",
+                    "color": "#ffc107",
+                    "font_size": 24
+                },
+                {
+                    "label": "Market Share",
+                    "value": "23%",
+                    "color": "#dc3545",
+                    "font_size": 24
+                }
+            ],
+            "title_color": "#2E86AB",
+            "description_color": "#333333"
+        },
+        "upload_to_s3": true
+    }
+    ```
+    """
+    try:
+        slide_data_dict = request.slide_data.dict()
+        
+        output_ppt = slide_data_service.generate_statistics_slide(
+            template_s3_url=request.template_s3_url,
+            slide_data=slide_data_dict
+        )
+        
+        filename = request.output_filename or f"statistics_slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        
+        if request.upload_to_s3:
+            upload_result = s3_service.upload_file(
+                file_data=output_ppt.getvalue(),
+                filename=filename,
+                folder="generated_presentations"
+            )
+            
+            if not upload_result.get('success'):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload to S3: {upload_result.get('error')}"
+                )
+            
+            return {
+                "success": True,
+                "message": "Statistics slide generated successfully",
+                "s3_url": upload_result['s3_url'],
+                "s3_key": upload_result['s3_key'],
+                "filename": filename,
+                "slide_type": "statistics",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            output_ppt.seek(0)
+            return StreamingResponse(
+                output_ppt,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        error_msg = str(re)
+        if "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found in S3. Please check: 1) The S3 key/URL is correct, 2) The file exists in S3, 3) AWS credentials are valid. Error: {error_msg}"
+            )
+        raise HTTPException(status_code=500, detail=f"Error generating statistics slide: {error_msg}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating statistics slide: {str(e)}"
+        )
+
+
+@router.post("/generate-people-slide")
+async def generate_people_slide(request: PeopleSlideRequest):
+    """
+    Generate a people slide
+    
+    Example request:
+    ```json
+    {
+        "template_s3_url": "https://bucket.s3.region.amazonaws.com/path/presentation.pptx",
+        "slide_data": {
+            "slide_number": 6,
+            "title": "Our Team",
+            "description": "Meet the key members of our organization",
+            "names": [
+                "John Smith",
+                "Sarah Johnson",
+                "Michael Chen",
+                "Emily Davis"
+            ],
+            "designations": [
+                "CEO & Founder",
+                "CTO",
+                "Lead Developer",
+                "Product Manager"
+            ],
+            "descriptions": [
+                "10+ years experience in tech leadership",
+                "Expert in cloud architecture and AI",
+                "Full-stack developer with 8 years experience",
+                "Product strategy and user experience specialist"
+            ],
+            "title_color": "#2E86AB",
+            "description_color": "#333333"
+        },
+        "upload_to_s3": true
+    }
+    ```
+    """
+    try:
+        slide_data_dict = request.slide_data.dict()
+        
+        output_ppt = slide_data_service.generate_people_slide(
+            template_s3_url=request.template_s3_url,
+            slide_data=slide_data_dict
+        )
+        
+        filename = request.output_filename or f"people_slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        
+        if request.upload_to_s3:
+            upload_result = s3_service.upload_file(
+                file_data=output_ppt.getvalue(),
+                filename=filename,
+                folder="generated_presentations"
+            )
+            
+            if not upload_result.get('success'):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload to S3: {upload_result.get('error')}"
+                )
+            
+            return {
+                "success": True,
+                "message": "People slide generated successfully",
+                "s3_url": upload_result['s3_url'],
+                "s3_key": upload_result['s3_key'],
+                "filename": filename,
+                "slide_type": "people",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            output_ppt.seek(0)
+            return StreamingResponse(
+                output_ppt,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        error_msg = str(re)
+        if "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found in S3. Please check: 1) The S3 key/URL is correct, 2) The file exists in S3, 3) AWS credentials are valid. Error: {error_msg}"
+            )
+        raise HTTPException(status_code=500, detail=f"Error generating people slide: {error_msg}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating people slide: {str(e)}"
+        )
+
+
+@router.post("/generate-cover-slide")
+async def generate_cover_slide(request: CoverSlideRequest):
+    """
+    Generate a cover slide
+    
+    Example request:
+    ```json
+    {
+        "template_s3_url": "https://bucket.s3.region.amazonaws.com/path/presentation.pptx",
+        "slide_data": {
+            "slide_number": 1,
+            "title": "Annual Business Report 2024",
+            "subtitle": "Generated via Template Flow",
+            "slide_name": "Annual Business Report 2024",
+            "slide_data_id": "cover_001",
+            "slide_type": "Cover",
+            "company_name": "TechCorp Solutions",
+            "image": [
+                "https://example.com/logo.png",
+                "https://example.com/background.jpg"
+            ],
+            "colors": {
+                "primary": "#2E86AB",
+                "secondary": "#A23B72",
+                "accent": "#F18F01",
+                "background": "#C73E1D"
+            }
+        },
+        "upload_to_s3": true
+    }
+    ```
+    """
+    try:
+        slide_data_dict = request.slide_data.dict()
+        
+        output_ppt = slide_data_service.generate_cover_slide(
+            template_s3_url=request.template_s3_url,
+            slide_data=slide_data_dict
+        )
+        
+        filename = request.output_filename or f"cover_slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        
+        if request.upload_to_s3:
+            upload_result = s3_service.upload_file(
+                file_data=output_ppt.getvalue(),
+                filename=filename,
+                folder="generated_presentations"
+            )
+            
+            if not upload_result.get('success'):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload to S3: {upload_result.get('error')}"
+                )
+            
+            return {
+                "success": True,
+                "message": "Cover slide generated successfully",
+                "s3_url": upload_result['s3_url'],
+                "s3_key": upload_result['s3_key'],
+                "filename": filename,
+                "slide_type": "cover",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            output_ppt.seek(0)
+            return StreamingResponse(
+                output_ppt,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        error_msg = str(re)
+        if "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found in S3. Please check: 1) The S3 key/URL is correct, 2) The file exists in S3, 3) AWS credentials are valid. Error: {error_msg}"
+            )
+        raise HTTPException(status_code=500, detail=f"Error generating cover slide: {error_msg}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating cover slide: {str(e)}"
+        )
+
+
+@router.post("/generate-contact-slide")
+async def generate_contact_slide(request: ContactSlideRequest):
+    """
+    Generate a contact slide
+    
+    Example request:
+    ```json
+    {
+        "template_s3_url": "https://bucket.s3.region.amazonaws.com/path/presentation.pptx",
+        "slide_data": {
+            "slide_number": 10,
+            "title": "Contact Us",
+            "slide_name": "Contact Information",
+            "website_link": "https://www.techcorp.com",
+            "linkedin_link": "https://linkedin.com/company/techcorp",
+            "contact_email": "info@techcorp.com",
+            "contact_phone": "+1 (555) 123-4567",
+            "image": [
+                "https://example.com/contact-bg.jpg",
+                "https://example.com/qr-code.png"
+            ],
+            "colors": {
+                "primary": "#2E86AB",
+                "secondary": "#A23B72",
+                "text": "#333333",
+                "background": "#f8f9fa"
+            }
+        },
+        "upload_to_s3": true
+    }
+    ```
+    """
+    try:
+        slide_data_dict = request.slide_data.dict()
+        
+        output_ppt = slide_data_service.generate_contact_slide(
+            template_s3_url=request.template_s3_url,
+            slide_data=slide_data_dict
+        )
+        
+        filename = request.output_filename or f"contact_slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        
+        if request.upload_to_s3:
+            upload_result = s3_service.upload_file(
+                file_data=output_ppt.getvalue(),
+                filename=filename,
+                folder="generated_presentations"
+            )
+            
+            if not upload_result.get('success'):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload to S3: {upload_result.get('error')}"
+                )
+            
+            return {
+                "success": True,
+                "message": "Contact slide generated successfully",
+                "s3_url": upload_result['s3_url'],
+                "s3_key": upload_result['s3_key'],
+                "filename": filename,
+                "slide_type": "contact",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            output_ppt.seek(0)
+            return StreamingResponse(
+                output_ppt,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        error_msg = str(re)
+        if "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found in S3. Please check: 1) The S3 key/URL is correct, 2) The file exists in S3, 3) AWS credentials are valid. Error: {error_msg}"
+            )
+        raise HTTPException(status_code=500, detail=f"Error generating contact slide: {error_msg}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating contact slide: {str(e)}"
+        )
+
+
+@router.post("/generate-images-slide")
+async def generate_images_slide(request: ImagesSlideRequest):
+    """
+    Generate an images slide
+    
+    Example request:
+    ```json
+    {
+        "template_s3_url": "https://bucket.s3.region.amazonaws.com/path/presentation.pptx",
+        "slide_data": {
+            "slide_number": 7,
+            "slide_name": "Product Gallery",
+            "title": "Our Products",
+            "headers": [
+                "Mobile App",
+                "Web Platform",
+                "Desktop Software",
+                "API Integration"
+            ],
+            "descriptions": [
+                "Cross-platform mobile application with intuitive design",
+                "Responsive web platform for all devices",
+                "Powerful desktop software for professionals",
+                "Seamless API integration for developers"
+            ],
+            "images": [
+                "https://example.com/mobile-app.png",
+                "https://example.com/web-platform.jpg",
+                "https://example.com/desktop-software.png",
+                "https://example.com/api-docs.jpg"
+            ]
+        },
+        "upload_to_s3": true
+    }
+    ```
+    """
+    try:
+        slide_data_dict = request.slide_data.dict()
+        
+        output_ppt = slide_data_service.generate_images_slide(
+            template_s3_url=request.template_s3_url,
+            slide_data=slide_data_dict
+        )
+        
+        filename = request.output_filename or f"images_slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        
+        if request.upload_to_s3:
+            upload_result = s3_service.upload_file(
+                file_data=output_ppt.getvalue(),
+                filename=filename,
+                folder="generated_presentations"
+            )
+            
+            if not upload_result.get('success'):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload to S3: {upload_result.get('error')}"
+                )
+            
+            return {
+                "success": True,
+                "message": "Images slide generated successfully",
+                "s3_url": upload_result['s3_url'],
+                "s3_key": upload_result['s3_key'],
+                "filename": filename,
+                "slide_type": "images",
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            output_ppt.seek(0)
+            return StreamingResponse(
+                output_ppt,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        error_msg = str(re)
+        if "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found in S3. Please check: 1) The S3 key/URL is correct, 2) The file exists in S3, 3) AWS credentials are valid. Error: {error_msg}"
+            )
+        raise HTTPException(status_code=500, detail=f"Error generating images slide: {error_msg}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating images slide: {str(e)}"
+        )
+
+
 @router.post("/generate-multi-slide")
 async def generate_multi_slide_presentation(request: MultiSlideRequest):
     """
@@ -574,6 +1151,36 @@ async def get_supported_slide_types():
                 "description": "Slide with timeline/phases information",
                 "required_fields": ["slide_number", "title", "phases"],
                 "optional_fields": ["timeline_color"]
+            },
+            {
+                "type": "statistics",
+                "description": "Slide with key statistics and metrics",
+                "required_fields": ["slide_number", "title", "stat_data"],
+                "optional_fields": ["description", "title_color", "description_color", "background_color"]
+            },
+            {
+                "type": "people",
+                "description": "Slide with team members or people information",
+                "required_fields": ["slide_number", "title", "names", "designations", "descriptions"],
+                "optional_fields": ["description", "title_color", "description_color", "background_color"]
+            },
+            {
+                "type": "cover",
+                "description": "Cover slide for presentation",
+                "required_fields": ["slide_number", "title", "company_name"],
+                "optional_fields": ["subtitle", "slide_name", "slide_data_id", "slide_type", "image", "colors"]
+            },
+            {
+                "type": "contact",
+                "description": "Contact information slide",
+                "required_fields": ["slide_number", "title", "slide_name", "website_link"],
+                "optional_fields": ["linkedin_link", "contact_email", "contact_phone", "image", "colors"]
+            },
+            {
+                "type": "images",
+                "description": "Slide with multiple images, headers, and descriptions",
+                "required_fields": ["slide_number", "slide_name", "title"],
+                "optional_fields": ["headers", "descriptions", "images"]
             }
         ],
         "note": "More slide types can be added easily using the handler pattern"

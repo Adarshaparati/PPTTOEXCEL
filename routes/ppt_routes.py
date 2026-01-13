@@ -130,27 +130,27 @@ async def extract_ppt(
         )
         
         # Save Excel locally
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename_base = os.path.basename(s3_key).replace('.pptx', '').replace('.ppt', '')
-        excel_filename = f"PPT_Analysis_{filename_base}_{timestamp}.xlsx"
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # filename_base = os.path.basename(s3_key).replace('.pptx', '').replace('.ppt', '')
+        # excel_filename = f"PPT_Analysis_{filename_base}_{timestamp}.xlsx"
         
-        output_folder = "output"
-        os.makedirs(output_folder, exist_ok=True)
-        local_excel_path = os.path.join(output_folder, excel_filename)
+        # output_folder = "output"
+        # os.makedirs(output_folder, exist_ok=True)
+        # local_excel_path = os.path.join(output_folder, excel_filename)
         
-        wb.save(local_excel_path)
+        # wb.save(local_excel_path)
         
-        # Optionally upload Excel to S3
-        excel_s3_url = None
-        if upload_images:  # Use same flag for consistency
-            with open(local_excel_path, 'rb') as f:
-                excel_bytes = f.read()
-            excel_upload_result = s3_service.upload_excel_to_s3(
-                excel_data=excel_bytes,
-                filename=excel_filename
-            )
-            if excel_upload_result.get('success'):
-                excel_s3_url = excel_upload_result.get('s3_url')
+        # # Optionally upload Excel to S3
+        # excel_s3_url = None
+        # if upload_images:  # Use same flag for consistency
+        #     with open(local_excel_path, 'rb') as f:
+        #         excel_bytes = f.read()
+        #     excel_upload_result = s3_service.upload_excel_to_s3(
+        #         excel_data=excel_bytes,
+        #         filename=excel_filename
+        #     )
+        #     if excel_upload_result.get('success'):
+        #         excel_s3_url = excel_upload_result.get('s3_url')
         
         # Save to Google Sheets
         sheets_result = None
@@ -172,7 +172,7 @@ async def extract_ppt(
             "success": True,
             "message": "Data extracted successfully",
             "template_id": template_id,
-            "extracted_data": extracted_data,
+            # "extracted_data": extracted_data,
             "excel_filename": excel_filename,
             "local_excel_path": local_excel_path,
             "excel_s3_url": excel_s3_url,
@@ -249,27 +249,27 @@ async def upload_and_extract(
         )
         
         # Save Excel locally
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename_base = file.filename.replace('.pptx', '').replace('.ppt', '')
-        excel_filename = f"PPT_Analysis_{filename_base}_{timestamp}.xlsx"
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # filename_base = file.filename.replace('.pptx', '').replace('.ppt', '')
+        # excel_filename = f"PPT_Analysis_{filename_base}_{timestamp}.xlsx"
         
-        output_folder = "output"
-        os.makedirs(output_folder, exist_ok=True)
-        local_excel_path = os.path.join(output_folder, excel_filename)
+        # output_folder = "output"
+        # os.makedirs(output_folder, exist_ok=True)
+        # local_excel_path = os.path.join(output_folder, excel_filename)
         
-        wb.save(local_excel_path)
+        # wb.save(local_excel_path)
         
-        # Optionally upload Excel to S3
-        excel_s3_url = None
-        if upload_images_to_s3:
-            with open(local_excel_path, 'rb') as f:
-                excel_bytes = f.read()
-            excel_upload_result = s3_service.upload_excel_to_s3(
-                excel_data=excel_bytes,
-                filename=excel_filename
-            )
-            if excel_upload_result.get('success'):
-                excel_s3_url = excel_upload_result.get('s3_url')
+        # # Optionally upload Excel to S3
+        # excel_s3_url = None
+        # if upload_images_to_s3:
+        #     with open(local_excel_path, 'rb') as f:
+        #         excel_bytes = f.read()
+        #     excel_upload_result = s3_service.upload_excel_to_s3(
+        #         excel_data=excel_bytes,
+        #         filename=excel_filename
+        #     )
+        #     if excel_upload_result.get('success'):
+        #         excel_s3_url = excel_upload_result.get('s3_url')
         
         # Save to Google Sheets
         sheets_result = None
