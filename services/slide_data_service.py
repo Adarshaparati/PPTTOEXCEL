@@ -16,6 +16,11 @@ from services.handlers.points import handle_points_slide
 from services.handlers.image_text import handle_image_text_slide
 from services.handlers.table import handle_table_slide
 from services.handlers.phases import handle_phases_slide
+from services.handlers.statistics import handle_statistics_slide
+from services.handlers.people import handle_people_slide
+from services.handlers.cover import handle_cover_slide
+from services.handlers.contact import handle_contact_slide
+from services.handlers.images import handle_images_slide
 
 
 class SlideDataService:
@@ -147,6 +152,11 @@ class SlideDataService:
             'image_text': handle_image_text_slide,
             'table': handle_table_slide,
             'phases': handle_phases_slide,
+            'statistics': handle_statistics_slide,
+            'people': handle_people_slide,
+            'cover': handle_cover_slide,
+            'contact': handle_contact_slide,
+            'images': handle_images_slide,
         }
         
         handler = handler_map.get(slide_type)
@@ -178,8 +188,28 @@ class SlideDataService:
         return self.generate_slide('table', template_s3_url, slide_data)
     
     def generate_phases_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
-        """Generate phases slide - new slide type"""
+        """Generate phases slide - backwards compatible method"""
         return self.generate_slide('phases', template_s3_url, slide_data)
+    
+    def generate_statistics_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
+        """Generate statistics slide - backwards compatible method"""
+        return self.generate_slide('statistics', template_s3_url, slide_data)
+    
+    def generate_people_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
+        """Generate people slide - backwards compatible method"""
+        return self.generate_slide('people', template_s3_url, slide_data)
+    
+    def generate_cover_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
+        """Generate cover slide - backwards compatible method"""
+        return self.generate_slide('cover', template_s3_url, slide_data)
+    
+    def generate_contact_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
+        """Generate contact slide - backwards compatible method"""
+        return self.generate_slide('contact', template_s3_url, slide_data)
+    
+    def generate_images_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
+        """Generate images slide - backwards compatible method"""
+        return self.generate_slide('images', template_s3_url, slide_data)
     
     def generate_multi_slide_presentation(
         self,
@@ -187,46 +217,241 @@ class SlideDataService:
         slides_config: List[Dict[str, Any]]
     ) -> BytesIO:
         """
-        Generate multiple slides in a single presentation using the new handler-based approach
+        OPTIMIZED: Generate multiple slides in a single presentation
+        
+        Downloads template ONCE, loads presentation ONCE, modifies all slides,
+        then saves ONCE for maximum efficiency.
         
         Args:
             template_s3_url: S3 URL of the PowerPoint template
             slides_config: List of slide configurations, each containing:
-                - slide_type: str - Type of slide ('points', 'image_text', 'table', 'phases')
+                - slide_type: str - Type of slide ('points', 'image_text', 'table', 'phases', etc.)
                 - slide_data: Dict - Data specific to the slide type
                 
         Returns:
             BytesIO object containing the complete presentation
         """
-        print(f"🎨 Generating multi-slide presentation...")
+        print(f"🎨 Generating multi-slide presentation (OPTIMIZED)...")
         
-        # Download template once
+        # Download template ONCE from S3
         presentation_bytes = self.download_template_from_s3(template_s3_url)
-        current_presentation = presentation_bytes
+        
+        # Load presentation ONCE into memory
+        prs = Presentation(presentation_bytes)
+        print(f"📄 Loaded presentation with {len(prs.slides)} slides")
         
         # Process each slide configuration
-        for config in slides_config:
+        slides_processed = 0
+        for idx, config in enumerate(slides_config, 1):
             slide_type = config.get('slide_type')
             slide_data = config.get('slide_data', {})
             
             if not slide_type:
-                print(f"⚠️ Skipping config without slide_type")
+                print(f"⚠️ Skipping config {idx} without slide_type")
                 continue
             
             try:
-                # Use the universal handler for each slide
-                current_presentation = self._process_slide_in_presentation(
-                    current_presentation, slide_type, slide_data
-                )
+                print(f"🔧 Processing slide {idx}/{len(slides_config)}: {slide_type}")
+                self._modify_slide_in_presentation(prs, slide_type, slide_data)
+                slides_processed += 1
             except Exception as e:
                 print(f"⚠️ Error processing {slide_type} slide: {e}")
                 continue
         
-        print(f"✅ Multi-slide presentation generated successfully")
-        return current_presentation
+        # Save presentation ONCE to BytesIO
+        output = BytesIO()
+        prs.save(output)
+        output.seek(0)
+        
+        print(f"✅ Multi-slide presentation generated successfully ({slides_processed}/{len(slides_config)} slides processed)")
+        return output
+    
+    def _modify_slide_in_presentation(self, prs: Presentation, slide_type: str, slide_data: Dict[str, Any]) -> None:
+        """
+        OPTIMIZED: Modify a single slide directly in the presentation object
+        
+        This method works directly on the Presentation object instead of using
+        BytesIO chaining, which is more efficient for multi-slide generation.
+        
+        Args:
+            prs: Presentation object to modify
+            slide_type: Type of slide ('points', 'image_text', 'table', 'phases', etc.)
+            slide_data: Dictionary with slide configuration
+        """
+        from io import BytesIO
+        
+        # Get slide number and validate
+        slide_number = slide_data.get('slide_number', 1)
+        slide_index = slide_number - 1
+        
+        if slide_index >= len(prs.slides) or slide_index < 0:
+            raise ValueError(f"Slide {slide_number} not found in presentation (has {len(prs.slides)} slides)")
+        
+        slide = prs.slides[slide_index]
+        print(f"📝 Modifying slide {slide_number} ({slide_type})...")
+        
+        # Download image if needed
+        image_data = None
+        if slide_data.get('image_url'):
+            try:
+                image_data = self.download_image_from_url(slide_data['image_url'])
+            except Exception as e:
+                print(f"⚠️ Warning: Could not download image for {slide_type}: {e}")
+        
+        # Handle multiple images for cover/contact/images slide types
+        if slide_data.get('image') and isinstance(slide_data['image'], list):
+            # These slide types handle multiple images internally
+            pass
+        
+        # Route to appropriate modification logic based on slide type
+        if slide_type == 'points':
+            self._modify_points_slide(slide, slide_data, image_data)
+        elif slide_type == 'image_text':
+            self._modify_image_text_slide(slide, slide_data, image_data)
+        elif slide_type == 'table':
+            self._modify_table_slide(slide, slide_data)
+        elif slide_type == 'phases':
+            self._modify_phases_slide(slide, slide_data, image_data)
+        elif slide_type == 'statistics':
+            self._modify_statistics_slide(slide, slide_data, image_data)
+        elif slide_type == 'people':
+            self._modify_people_slide(slide, slide_data, image_data)
+        elif slide_type == 'cover':
+            self._modify_cover_slide(slide, slide_data)
+        elif slide_type == 'contact':
+            self._modify_contact_slide(slide, slide_data)
+        elif slide_type == 'images':
+            self._modify_images_slide(slide, slide_data)
+        else:
+            raise ValueError(f"Unsupported slide type: {slide_type}")
+        
+        print(f"✅ Slide {slide_number} modified successfully")
+    
+    # Import helper functions from handlers to reuse logic
+    def _modify_points_slide(self, slide, slide_data: Dict[str, Any], image_data: BytesIO = None):
+        """Modify points slide directly"""
+        from services.handlers.points import _update_header, _update_description, _update_image, _update_points
+        
+        if slide_data.get('header'):
+            _update_header(slide, slide_data)
+        if slide_data.get('description'):
+            _update_description(slide, slide_data)
+        if image_data and slide_data.get('image_url'):
+            _update_image(slide, image_data)
+        if slide_data.get('points'):
+            _update_points(slide, slide_data)
+    
+    def _modify_image_text_slide(self, slide, slide_data: Dict[str, Any], image_data: BytesIO = None):
+        """Modify image+text slide directly"""
+        from services.handlers.image_text import _update_title, _update_text, _update_image
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('text'):
+            _update_text(slide, slide_data)
+        if image_data and slide_data.get('image_url'):
+            _update_image(slide, image_data)
+    
+    def _modify_table_slide(self, slide, slide_data: Dict[str, Any]):
+        """Modify table slide directly"""
+        from services.handlers.table import _update_title, _update_table
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('table_data'):
+            _update_table(slide, slide_data)
+    
+    def _modify_phases_slide(self, slide, slide_data: Dict[str, Any], image_data: BytesIO = None):
+        """Modify phases slide directly"""
+        from services.handlers.phases import _update_title, _update_phases, _update_image
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('phases'):
+            _update_phases(slide, slide_data)
+        if image_data and slide_data.get('image_url'):
+            _update_image(slide, image_data)
+    
+    def _modify_statistics_slide(self, slide, slide_data: Dict[str, Any], image_data: BytesIO = None):
+        """Modify statistics slide directly"""
+        from services.handlers.statistics import _update_title, _update_description, _update_statistics, _update_background_color, _update_image
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('description'):
+            _update_description(slide, slide_data)
+        if slide_data.get('stat_data'):
+            _update_statistics(slide, slide_data)
+        if slide_data.get('background_color'):
+            _update_background_color(slide, slide_data['background_color'])
+        if image_data and slide_data.get('image_url'):
+            _update_image(slide, image_data)
+    
+    def _modify_people_slide(self, slide, slide_data: Dict[str, Any], image_data: BytesIO = None):
+        """Modify people slide directly"""
+        from services.handlers.people import _update_title, _update_description, _update_people, _update_background_color, _update_image
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('description'):
+            _update_description(slide, slide_data)
+        if slide_data.get('names'):
+            _update_people(slide, slide_data)
+        if slide_data.get('background_color'):
+            _update_background_color(slide, slide_data['background_color'])
+        if image_data and slide_data.get('image_url'):
+            _update_image(slide, image_data)
+    
+    def _modify_cover_slide(self, slide, slide_data: Dict[str, Any]):
+        """Modify cover slide directly"""
+        from services.handlers.cover import _update_title, _update_subtitle, _update_company_name, _update_images_from_urls, _apply_color_scheme
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('subtitle'):
+            _update_subtitle(slide, slide_data)
+        if slide_data.get('company_name'):
+            _update_company_name(slide, slide_data)
+        if slide_data.get('image'):
+            _update_images_from_urls(slide, slide_data.get('image', []))
+        if slide_data.get('colors'):
+            _apply_color_scheme(slide, slide_data.get('colors', {}))
+    
+    def _modify_contact_slide(self, slide, slide_data: Dict[str, Any]):
+        """Modify contact slide directly"""
+        from services.handlers.contact import _update_title, _update_website, _update_linkedin, _update_email, _update_phone, _update_images_from_urls, _apply_color_scheme
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('website_link'):
+            _update_website(slide, slide_data)
+        if slide_data.get('linkedin_link'):
+            _update_linkedin(slide, slide_data)
+        if slide_data.get('contact_email'):
+            _update_email(slide, slide_data)
+        if slide_data.get('contact_phone'):
+            _update_phone(slide, slide_data)
+        if slide_data.get('image'):
+            _update_images_from_urls(slide, slide_data.get('image', []))
+        if slide_data.get('colors'):
+            _apply_color_scheme(slide, slide_data.get('colors', {}))
+    
+    def _modify_images_slide(self, slide, slide_data: Dict[str, Any]):
+        """Modify images slide directly"""
+        from services.handlers.images import _update_title, _update_image_gallery
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('images'):
+            _update_image_gallery(slide, slide_data)
     
     def _process_slide_in_presentation(self, presentation_bytes: BytesIO, slide_type: str, slide_data: Dict[str, Any]) -> BytesIO:
-        """Process a single slide in a presentation"""
+        """
+        LEGACY: Process a single slide in a presentation (BytesIO chaining)
+        
+        This method is kept for backward compatibility but is less efficient
+        than the new _modify_slide_in_presentation method used in multi-slide generation.
+        """
         # Download image if needed
         image_data = None
         if slide_data.get('image_url'):
@@ -241,6 +466,11 @@ class SlideDataService:
             'image_text': handle_image_text_slide,
             'table': handle_table_slide,
             'phases': handle_phases_slide,
+            'statistics': handle_statistics_slide,
+            'people': handle_people_slide,
+            'cover': handle_cover_slide,
+            'contact': handle_contact_slide,
+            'images': handle_images_slide,
         }
         
         handler = handler_map.get(slide_type)
