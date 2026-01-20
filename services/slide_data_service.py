@@ -21,6 +21,7 @@ from services.handlers.people import handle_people_slide
 from services.handlers.cover import handle_cover_slide
 from services.handlers.contact import handle_contact_slide
 from services.handlers.images import handle_images_slide
+from services.handlers.graphs import handle_graph_slide
 
 
 class SlideDataService:
@@ -157,6 +158,7 @@ class SlideDataService:
             'cover': handle_cover_slide,
             'contact': handle_contact_slide,
             'images': handle_images_slide,
+            'graphs': handle_graph_slide,
         }
         
         handler = handler_map.get(slide_type)
@@ -210,6 +212,10 @@ class SlideDataService:
     def generate_images_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
         """Generate images slide - backwards compatible method"""
         return self.generate_slide('images', template_s3_url, slide_data)
+    
+    def generate_graph_slide(self, template_s3_url: str, slide_data: Dict[str, Any]) -> BytesIO:
+        """Generate graph slide - backwards compatible method"""
+        return self.generate_slide('graphs', template_s3_url, slide_data)
     
     def generate_multi_slide_presentation(
         self,
@@ -322,6 +328,8 @@ class SlideDataService:
             self._modify_contact_slide(slide, slide_data)
         elif slide_type == 'images':
             self._modify_images_slide(slide, slide_data)
+        elif slide_type == 'graphs':
+            self._modify_graph_slide(slide, slide_data)
         else:
             raise ValueError(f"Unsupported slide type: {slide_type}")
         
@@ -445,6 +453,15 @@ class SlideDataService:
         if slide_data.get('images'):
             _update_image_gallery(slide, slide_data)
     
+    def _modify_graph_slide(self, slide, slide_data: Dict[str, Any]):
+        """Modify graph slide directly"""
+        from services.handlers.graphs import _update_title, _update_chart
+        
+        if slide_data.get('title'):
+            _update_title(slide, slide_data)
+        if slide_data.get('chart_data'):
+            _update_chart(slide, slide_data)
+    
     def _process_slide_in_presentation(self, presentation_bytes: BytesIO, slide_type: str, slide_data: Dict[str, Any]) -> BytesIO:
         """
         LEGACY: Process a single slide in a presentation (BytesIO chaining)
@@ -471,6 +488,7 @@ class SlideDataService:
             'cover': handle_cover_slide,
             'contact': handle_contact_slide,
             'images': handle_images_slide,
+            'graphs': handle_graph_slide,
         }
         
         handler = handler_map.get(slide_type)
