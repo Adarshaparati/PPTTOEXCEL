@@ -162,10 +162,8 @@ async def extract_ppt(
                 
                 sheets_result = sheets_svc.append_ppt_data(
                     template_id=template_id,
-                    ppt_filename=filename_base,
                     s3_url=ppt_s3_url,
                     slide_data=extracted_data.get('slides', []),
-                    excel_url=excel_s3_url
                 )
         
         return {
@@ -173,10 +171,10 @@ async def extract_ppt(
             "message": "Data extracted successfully",
             "template_id": template_id,
             # "extracted_data": extracted_data,
-            "excel_filename": excel_filename,
-            "local_excel_path": local_excel_path,
-            "excel_s3_url": excel_s3_url,
-            "download_url": f"/api/download/{excel_filename}",
+            # "excel_filename": excel_filename,
+            # "local_excel_path": local_excel_path,
+            # "excel_s3_url": excel_s3_url,
+            # "download_url": f"/api/download/{excel_filename}",
             "sheets_saved": sheets_result.get('success') if sheets_result else False,
             "sheets_result": sheets_result,
             "timestamp": datetime.now().isoformat()
@@ -278,10 +276,9 @@ async def upload_and_extract(
             if sheets_svc:
                 sheets_result = sheets_svc.append_ppt_data(
                     template_id=template_id,
-                    ppt_filename=file.filename,
                     s3_url=upload_result['s3_url'],
                     slide_data=extracted_data.get('slides', []),
-                    excel_url=excel_s3_url
+                  
                 )
         
         return {
@@ -293,10 +290,10 @@ async def upload_and_extract(
             "original_filename": file.filename,
             "file_size": len(file_content),
             "extracted_data": extracted_data,
-            "excel_filename": excel_filename,
-            "local_excel_path": local_excel_path,
-            "excel_s3_url": excel_s3_url,
-            "download_url": f"/api/download/{excel_filename}",
+            # "excel_filename": excel_filename,
+            # "local_excel_path": local_excel_path,
+            # "excel_s3_url": excel_s3_url,
+            # "download_url": f"/api/download/{excel_filename}",
             "sheets_saved": sheets_result.get('success') if sheets_result else False,
             "sheets_result": sheets_result,
             "timestamp": datetime.now().isoformat()

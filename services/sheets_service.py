@@ -75,10 +75,9 @@ class GoogleSheetsService:
     def append_ppt_data(
         self,
         template_id: str,
-        ppt_filename: str,
         s3_url: str,
         slide_data: List[Dict],
-        excel_url: str = None
+        
     ) -> Dict:
         """
         Append PowerPoint extraction data to Google Sheets
