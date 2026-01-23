@@ -135,6 +135,40 @@ class TableSlideData(BaseModel):
     header_color: Optional[str] = Field(None, description="Hex color for header")
 
 
+class ChartDataset(BaseModel):
+    """Model for chart dataset"""
+    label: str = Field(..., description="Dataset label/name")
+    data: List[str] = Field(..., description="Array of data values")
+
+
+class ChartData(BaseModel):
+    """Model for chart data structure"""
+    labels: List[str] = Field(..., description="Chart labels/categories")
+    datasets: List[ChartDataset] = Field(..., description="Chart datasets")
+
+
+class Chart(BaseModel):
+    """Model for individual chart"""
+    title: str = Field(..., description="Chart title")
+    chart_data: ChartData = Field(..., description="Chart data with labels and datasets")
+
+
+class ChartOptions(BaseModel):
+    """Model for chart options"""
+    responsive: Optional[bool] = Field(True, description="Responsive chart")
+    maintainAspectRatio: Optional[bool] = Field(False, description="Maintain aspect ratio")
+    backgroundColor: Optional[str] = Field("#FFFFFF", description="Background color")
+
+
+class GraphSlideData(BaseModel):
+    """Model for graph/chart slide data"""
+    slide_number: int = Field(..., description="Slide number to update (1-indexed)", ge=1)
+    title: str = Field(..., description="Slide title")
+    chart_type: Optional[str] = Field("bar", description="Chart type: bar, line, pie, column, area")
+    charts: List[Chart] = Field(..., description="List of charts to display")
+    chart_options: Optional[ChartOptions] = Field(None, description="Chart configuration options")
+
+
 class PointsSlideRequest(BaseModel):
     """Request model for generating points slide"""
     template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
@@ -155,6 +189,15 @@ class TableSlideRequest(BaseModel):
     """Request model for generating table slide"""
     template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
     slide_data: TableSlideData
+    upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
+    output_filename: Optional[str] = Field(None, description="Custom output filename")
+
+
+class GraphSlideRequest(BaseModel):
+    """Request model for generating graph slide"""
+    template_s3_url: str = Field(..., description="S3 URL or key of the PowerPoint template")
+    templateId: Optional[str] = Field(None, description="Template identifier")
+    slide_data: GraphSlideData
     upload_to_s3: bool = Field(True, description="Upload generated PPT to S3")
     output_filename: Optional[str] = Field(None, description="Custom output filename")
 
@@ -209,7 +252,7 @@ class ImagesSlideRequest(BaseModel):
 
 class SlideConfig(BaseModel):
     """Model for individual slide configuration in multi-slide generation"""
-    slide_type: str = Field(..., description="Type of slide: 'points', 'image_text', 'table', 'phases', 'statistics', 'people', 'cover', 'contact', or 'images'")
+    slide_type: str = Field(..., description="Type of slide: 'points', 'image_text', 'table', 'phases', 'statistics', 'people', 'cover', 'contact', 'images', or 'graphs'")
     slide_data: Dict[str, Any] = Field(..., description="Data specific to the slide type")
 
 
@@ -462,6 +505,107 @@ async def generate_table_slide(request: TableSlideRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Error generating table slide: {str(e)}"
+        )
+
+
+@router.post("/generate-graph-slide")
+async def generate_graph_slide(request: GraphSlideRequest):
+    """
+    Generate a graph/chart slide
+    
+    Example request:
+    ```json
+    {
+        "template_s3_url": "presentations/template.pptx",
+        "templateId": "template_123",
+        "slide_data": {
+            "slide_number": 5,
+            "title": "Sales Performance Q4",
+            "chart_type": "bar",
+            "charts": [
+                {
+                    "title": "Monthly Revenue",
+                    "chart_data": {
+                        "labels": ["Oct", "Nov", "Dec", "Jan", "Feb"],
+                        "datasets": [
+                            {
+                                "label": "Sales 2024",
+                                "data": ["100000", "120000", "150000", "135000", "160000"]
+                            },
+                            {
+                                "label": "Sales 2025",
+                                "data": ["110000", "130000", "165000", "145000", "175000"]
+                            }
+                        ]
+                    }
+                }
+            ],
+            "chart_options": {
+                "responsive": true,
+                "maintainAspectRatio": false,
+                "backgroundColor": "#FFFFFF"
+            }
+        },
+        "upload_to_s3": true
+    }
+    ```
+    """
+    try:
+        slide_data_dict = request.slide_data.dict()
+        
+        output_ppt = slide_data_service.generate_graph_slide(
+            template_s3_url=request.template_s3_url,
+            slide_data=slide_data_dict
+        )
+        
+        filename = request.output_filename or f"graph_slide_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        
+        if request.upload_to_s3:
+            upload_result = s3_service.upload_file(
+                file_data=output_ppt.getvalue(),
+                filename=filename,
+                folder="generated_presentations"
+            )
+            
+            if not upload_result.get('success'):
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to upload to S3: {upload_result.get('error')}"
+                )
+            
+            return {
+                "success": True,
+                "message": "Graph slide generated successfully",
+                "s3_url": upload_result['s3_url'],
+                "s3_key": upload_result['s3_key'],
+                "filename": filename,
+                "slide_type": "graph",
+                "chart_type": slide_data_dict.get("chart_type", "bar"),
+                "charts_count": len(slide_data_dict.get("charts", [])),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            output_ppt.seek(0)
+            return StreamingResponse(
+                output_ppt,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+    
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        error_msg = str(re)
+        if "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Template not found in S3. Please check: 1) The S3 key/URL is correct, 2) The file exists in S3, 3) AWS credentials are valid. Error: {error_msg}"
+            )
+        raise HTTPException(status_code=500, detail=f"Error generating graph slide: {error_msg}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating graph slide: {str(e)}"
         )
 
 
@@ -1181,6 +1325,12 @@ async def get_supported_slide_types():
                 "description": "Slide with multiple images, headers, and descriptions",
                 "required_fields": ["slide_number", "slide_name", "title"],
                 "optional_fields": ["headers", "descriptions", "images"]
+            },
+            {
+                "type": "graphs",
+                "description": "Slide with charts and graphs",
+                "required_fields": ["slide_number", "title", "charts"],
+                "optional_fields": ["chart_type", "chart_options"]
             }
         ],
         "note": "More slide types can be added easily using the handler pattern"
