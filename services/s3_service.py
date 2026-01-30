@@ -81,20 +81,23 @@ class S3Service:
                 "error": str(e)
             }
     
-    def download_file(self, s3_key: str) -> Optional[bytes]:
+    def download_file(self, s3_key: str, bucket_name: Optional[str] = None) -> Optional[bytes]:
         """
         Download file from S3 and return raw bytes.
 
         Args:
             s3_key: S3 object key (should be unquoted/decoded)
+            bucket_name: Optional bucket name override (defaults to configured bucket)
 
         Returns:
             file content as bytes on success, or None on failure
         """
         try:
-            print(f"📥 S3 Download - Bucket: {self.bucket_name}, Key: {s3_key}")
+            # Use provided bucket or default
+            bucket = bucket_name if bucket_name else self.bucket_name
+            print(f"📥 S3 Download - Bucket: {bucket}, Key: {s3_key}")
             buffer = BytesIO()
-            self.s3_client.download_fileobj(self.bucket_name, s3_key, buffer)
+            self.s3_client.download_fileobj(bucket, s3_key, buffer)
             buffer.seek(0)
             data = buffer.getvalue()
             file_size = len(data)
