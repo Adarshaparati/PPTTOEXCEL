@@ -16,6 +16,7 @@ class S3Service:
         self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
         self.aws_region = os.getenv("AWS_REGION", "us-east-1")
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
+        self.cloudfront_domain = os.getenv("CLOUDFRONT_DOMAIN", None)  # e.g., d2zu6flr7wd65l.cloudfront.net
         
         if not all([self.aws_access_key, self.aws_secret_key, self.bucket_name]):
             raise ValueError("Missing AWS credentials or bucket name in environment variables")
@@ -26,6 +27,9 @@ class S3Service:
             aws_secret_access_key=self.aws_secret_key,
             region_name=self.aws_region
         )
+        
+        if self.cloudfront_domain:
+            print(f"✅ CloudFront domain configured: {self.cloudfront_domain}")
     
     def upload_file(
         self,
@@ -83,7 +87,10 @@ class S3Service:
     
     def download_file(self, s3_key: str, bucket_name: Optional[str] = None) -> Optional[bytes]:
         """
-        Download file from S3 and return raw bytes.
+        Download file from S3 using a three-tier strategy for maximum reliability:
+        1. CloudFront (fastest, no ACL issues)
+        2. Direct S3 HTTP (public access fallback)
+        3. Boto3 API (for private buckets with proper credentials)
 
         Args:
             s3_key: S3 object key (should be unquoted/decoded)
@@ -92,24 +99,132 @@ class S3Service:
         Returns:
             file content as bytes on success, or None on failure
         """
+        print(f"📥 Download Strategy: CloudFront → S3 HTTP → Boto3 API")
+        print(f"   S3 Key: {s3_key}")
+        
+        # Try CloudFront first (if configured)
+        if self.cloudfront_domain:
+            result = self._download_via_cloudfront(s3_key)
+            if result:
+                return result
+        
+        # Try direct S3 HTTP (public access)
+        bucket = bucket_name if bucket_name else self.bucket_name
+        result = self._download_file_via_http(s3_key, bucket)
+        if result:
+            return result
+        
+        # Fall back to Boto3 API (requires valid credentials)
+        return self._download_file_via_boto3(s3_key, bucket)
+    
+    def _download_via_cloudfront(self, s3_key: str) -> Optional[bytes]:
+        """
+        Download file via CloudFront CDN.
+        Works even with S3 ACL/ownership issues - recommended approach.
+        
+        Args:
+            s3_key: S3 object key
+        
+        Returns:
+            file content as bytes on success, or None on failure
+        """
         try:
-            # Use provided bucket or default
-            bucket = bucket_name if bucket_name else self.bucket_name
-            print(f"📥 S3 Download - Bucket: {bucket}, Key: {s3_key}")
+            import requests
+            
+            # URL encode the key to handle special characters
+            from urllib.parse import quote
+            encoded_key = quote(s3_key, safe='/')
+            cloudfront_url = f"https://{self.cloudfront_domain}/{encoded_key}"
+            
+            print(f"🌐 Tier 1: Trying CloudFront...")
+            print(f"   URL: {cloudfront_url}")
+            
+            response = requests.get(cloudfront_url, timeout=30)
+            
+            if response.status_code == 200:
+                file_size = len(response.content)
+                print(f"✅ CloudFront download successful ({file_size} bytes)")
+                return response.content
+            else:
+                print(f"⚠️ CloudFront returned {response.status_code}, trying fallback...")
+                return None
+                
+        except Exception as e:
+            print(f"⚠️ CloudFront failed ({type(e).__name__}), trying fallback...")
+            return None
+    
+    def _download_file_via_http(self, s3_key: str, bucket_name: str) -> Optional[bytes]:
+        """
+        Download file from S3 via HTTP public URL.
+        Works when bucket has public read policy.
+        
+        Args:
+            s3_key: S3 object key
+            bucket_name: Bucket name
+        
+        Returns:
+            file content as bytes on success, or None on failure
+        """
+        try:
+            import requests
+            
+            # Construct public S3 URL
+            # Format: https://bucket.s3.region.amazonaws.com/key
+            s3_url = f"https://{bucket_name}.s3.{self.aws_region}.amazonaws.com/{s3_key}"
+            
+            print(f"🌐 Tier 2: Trying Direct S3 HTTP...")
+            print(f"   URL: {s3_url}")
+            
+            response = requests.get(s3_url, timeout=30)
+            
+            if response.status_code == 200:
+                file_size = len(response.content)
+                print(f"✅ S3 HTTP download successful ({file_size} bytes)")
+                return response.content
+            elif response.status_code == 403:
+                print(f"⚠️ S3 HTTP returned 403 (Access Denied), trying fallback...")
+                return None
+            elif response.status_code == 404:
+                print(f"⚠️ S3 HTTP returned 404 (Not Found), trying fallback...")
+                return None
+            else:
+                print(f"⚠️ S3 HTTP returned {response.status_code}, trying fallback...")
+                return None
+                
+        except Exception as e:
+            print(f"⚠️ S3 HTTP failed ({type(e).__name__}), trying fallback...")
+            return None
+    
+    def _download_file_via_boto3(self, s3_key: str, bucket_name: str) -> Optional[bytes]:
+        """
+        Download file using Boto3 API.
+        Requires valid AWS credentials with S3 permissions.
+        
+        Args:
+            s3_key: S3 object key
+            bucket_name: Bucket name
+        
+        Returns:
+            file content as bytes on success, or None on failure
+        """
+        try:
+            print(f"🔑 Tier 3: Trying Boto3 API...")
+            print(f"   Bucket: {bucket_name}, Key: {s3_key}")
+            
             buffer = BytesIO()
-            self.s3_client.download_fileobj(bucket, s3_key, buffer)
+            self.s3_client.download_fileobj(bucket_name, s3_key, buffer)
             buffer.seek(0)
             data = buffer.getvalue()
             file_size = len(data)
-            print(f"✅ Downloaded {file_size} bytes from S3")
+            print(f"✅ Boto3 API download successful ({file_size} bytes)")
             return data
+            
         except self.s3_client.exceptions.NoSuchKey:
-            error_msg = f"File not found in S3. Key: {s3_key}"
-            print(f"❌ {error_msg}")
+            print(f"❌ Boto3 API: File not found")
             return None
         except Exception as e:
             error_msg = f"{type(e).__name__}: {str(e)}"
-            print(f"❌ Error downloading from S3: {error_msg}")
+            print(f"❌ Boto3 API failed: {error_msg}")
             return None
     
     def get_file_url(self, s3_key: str, expiration: int = 3600) -> Optional[str]:
